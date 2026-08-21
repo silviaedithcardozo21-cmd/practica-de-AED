@@ -1,0 +1,142 @@
+ACCION UTNBook ES
+AMBIENTE
+    fecha = REGISTRO
+        dia : N(2)
+        mes : N(2)
+        año : N(4)
+    FINREGISTRO
+    amigo = REGISTRO
+        Cod_Usuario : N(8)
+        Cod_Amigo : N(8)
+        Fecha_Amistad : fecha
+        Mensaje_Muro : AN(200)
+    FINREGISTRO
+    notificacion = REGISTRO
+        Cod_Usuario : N(8)
+        Cod_Amigo : N(8)
+        Cod_Movimiento : ("A","B","M")
+        Fecha_Amistad : fecha
+        Mensaje_Muro : AN(200)
+    FINREGISTRO
+
+    AMIGOS : ARCHIVO DE amigo ORDENADO POR Cod_Usuario, Cod_Amigo
+    NOTIFICACIONES : ARCHIVO DE notificacion ORDENADO POR Cod_Usuario, Cod_Amigo
+
+    NUEVO : ARCHIVO DE amigo ORDENADO POR Cod_Usuario, Cod_Amigo
+
+    ami : amigo
+    not : notificacion
+    reg_nuevo : amigo
+
+    SUBACCION leer_amigo ES
+        LEER(AMIGOS, ami)
+        SI FDA(AMIGOS) ENTONCES
+            ami.Cod_Usuario := HV
+        FINSI
+    FINSUBACCION
+
+    SUBACCION leer_notificacion ES
+        LEER(NOTIFICACIONES, not)
+        SI FDA(NOTIFICACIONES) ENTONCES
+            not.Cod_Usuario := HV
+        FINSI
+    FINSUBACCION
+
+PROCESO
+
+    ABRIR E/(AMIGOS)
+    ABRIR E/(NOTIFICACIONES)
+    ABRIR S/(NUEVO)
+    leer_amigo()
+    leer_notificacion()
+
+    MIENTRAS (ami.Cod_Usuario <> HV) O
+            (not.Cod_Usuario <> HV) HACER
+
+        SI (ami.Cod_Usuario, ami.Cod_Amigo) <
+           (not.Cod_Usuario, not.Cod_Amigo) ENTONCES
+            GRABAR(NUEVO, ami)
+            leer_amigo()
+        SINO
+
+            SI (ami.Cod_Usuario, ami.Cod_Amigo) =
+               (not.Cod_Usuario, not.Cod_Amigo) ENTONCES
+                SEGUN not.Cod_Movimiento HACER
+                    = "A":
+                        reg_nuevo := ami
+                        reg_nuevo.Fecha_Amistad :=
+                            not.Fecha_Amistad
+
+                        GRABAR(NUEVO, reg_nuevo)
+                    = "B":
+                        // No se graba:
+                        // baja física del registro
+                    = "M":
+                        reg_nuevo := ami
+                        reg_nuevo.Mensaje_Muro :=
+                            not.Mensaje_Muro
+                        GRABAR(NUEVO, reg_nuevo)
+
+                FINSEGUN
+                leer_amigo()
+                leer_notificacion()
+
+            SINO
+
+                // La notificación corresponde a una amistad
+                // que no existe actualmente
+
+                SI not.Cod_Movimiento = "A" ENTONCES
+
+                    reg_nuevo.Cod_Usuario :=
+                        not.Cod_Usuario
+
+                    reg_nuevo.Cod_Amigo :=
+                        not.Cod_Amigo
+
+                    reg_nuevo.Fecha_Amistad :=
+                        not.Fecha_Amistad
+
+                    reg_nuevo.Mensaje_Muro :=
+                        not.Mensaje_Muro
+
+                    GRABAR(NUEVO, reg_nuevo)
+
+                SINO
+
+                    ESC("ERROR: la amistad no existe")
+                FINSI
+                leer_notificacion()
+
+            FINSI
+
+        FINSI
+
+    FINMIENTRAS
+
+
+    MIENTRAS ami.Cod_Usuario <> HV HACER
+        GRABAR(NUEVO, ami)
+        leer_amigo()
+    FINMIENTRAS
+
+    MIENTRAS not.Cod_Usuario <> HV HACER
+
+        SI not.Cod_Movimiento = "A" ENTONCES
+            reg_nuevo.Cod_Usuario := not.Cod_Usuario
+            reg_nuevo.Cod_Amigo := not.Cod_Amigo
+            reg_nuevo.Fecha_Amistad := not.Fecha_Amistad
+            reg_nuevo.Mensaje_Muro := not.Mensaje_Muro
+            GRABAR(NUEVO, reg_nuevo)
+        SINO
+            ESC("ERROR: la amistad no existe")
+        FINSI
+        leer_notificacion()
+
+    FINMIENTRAS
+
+    CERRAR(AMIGOS)
+    CERRAR(NOTIFICACIONES)
+    CERRAR(NUEVO)
+
+FINACCION
