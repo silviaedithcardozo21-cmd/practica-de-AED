@@ -1,0 +1,193 @@
+ACCION actualizar_consumos ES
+
+AMBIENTE
+
+    fecha = REGISTRO
+        dia : N(2)
+        mes : N(2)
+        año : N(4)
+    FINREGISTRO
+
+
+    cliente = REGISTRO
+        Id_Casa : N(9)
+        Fecha_Ult_Lectura : fecha
+        Cant_Lecturas : N(9)
+        Prom_Lecturas : REAL
+        Tipo_Consumidor : ("A","B","C")
+    FINREGISTRO
+
+
+    medicion = REGISTRO
+        Id_Casa : N(9)
+        Fecha_Medicion : fecha
+        Consumo : REAL
+    FINREGISTRO
+
+
+    CLIENTE : ARCHIVO DE cliente ORDENADO POR Id_Casa
+    MEDICIONES : ARCHIVO DE medicion ORDENADO POR Id_Casa
+
+    NUEVO : ARCHIVO DE cliente ORDENADO POR Id_Casa
+
+    cli : cliente
+    med : medicion
+    nuevo : cliente
+
+    fecha_limite : fecha
+
+    cant_nuevas : ENTERO
+    suma_consumos : REAL
+    promedio : REAL
+    ultima_fecha : fecha
+
+
+    SUBACCION leer_cliente() ES
+
+        LEER(CLIENTE, cli)
+
+        SI FDA(CLIENTE) ENTONCES
+            cli.Id_Casa := HV
+        FINSI
+
+    FINSUBACCION
+
+
+    SUBACCION leer_medicion() ES
+
+        LEER(MEDICIONES, med)
+
+        SI FDA(MEDICIONES) ENTONCES
+            med.Id_Casa := HV
+        FINSI
+
+    FINSUBACCION
+
+
+    SUBACCION determinar_tipo() ES
+
+        SI promedio < 20 ENTONCES
+            nuevo.Tipo_Consumidor := "A"
+        SINO
+            SI promedio < 40 ENTONCES
+                nuevo.Tipo_Consumidor := "B"
+            SINO
+                nuevo.Tipo_Consumidor := "C"
+            FINSI
+        FINSI
+
+    FINSUBACCION
+
+
+PROCESO
+
+    fecha_limite.dia := 31
+    fecha_limite.mes := 1
+    fecha_limite.año := 2015
+
+    ABRIR E/(CLIENTE)
+    ABRIR E/(MEDICIONES)
+    ABRIR S/(NUEVO)
+
+    leer_cliente()
+    leer_medicion()
+
+    MIENTRAS (cli.Id_Casa <> HV) O
+            (med.Id_Casa <> HV) HACER
+
+        SI cli.Id_Casa < med.Id_Casa ENTONCES
+            GRABAR(NUEVO, cli)
+            leer_cliente()
+
+        SINO
+
+            SI cli.Id_Casa = med.Id_Casa ENTONCES
+                nuevo := cli
+                cant_nuevas := 0
+                suma_consumos := 0
+                ultima_fecha := cli.Fecha_Ult_Lectura
+
+                MIENTRAS NFDA(MEDICIONES) Y
+                      cli.Id_Casa = med.Id_Casa HACER
+                    SI med.Fecha_Medicion <= fecha_limite ENTONCES
+                        cant_nuevas := cant_nuevas + 1
+                        suma_consumos :=
+                            suma_consumos + med.Consumo
+                        SI med.Fecha_Medicion > ultima_fecha ENTONCES
+                            ultima_fecha := med.Fecha_Medicion
+                        FINSI
+                    FINSI
+                    leer_medicion()
+
+                FINMIENTRAS
+
+
+                SI cant_nuevas > 0 ENTONCES
+                    nuevo.Cant_Lecturas :=
+                        cli.Cant_Lecturas + cant_nuevas
+                    nuevo.Prom_Lecturas :=
+                        (cli.Prom_Lecturas * cli.Cant_Lecturas
+                         + suma_consumos)
+                        / nuevo.Cant_Lecturas
+                    nuevo.Fecha_Ult_Lectura := ultima_fecha
+                    promedio := nuevo.Prom_Lecturas
+                    determinar_tipo()
+
+                FINSI
+                GRABAR(NUEVO, nuevo)
+                leer_cliente()
+
+            SINO
+
+                // La casa no existe en CLIENTE.
+                // Es una conexión nueva.
+                nuevo.Id_Casa := med.Id_Casa
+                cant_nuevas := 0
+                suma_consumos := 0
+                MIENTRAS NFDA(MEDICIONES) Y
+                      med.Id_Casa = nuevo.Id_Casa HACER
+                    SI med.Fecha_Medicion <= fecha_limite ENTONCES
+                        cant_nuevas := cant_nuevas + 1
+                        suma_consumos :=
+                            suma_consumos + med.Consumo
+
+                        SI cant_nuevas = 1 ENTONCES
+                            ultima_fecha :=
+                                med.Fecha_Medicion
+                        SINO
+                            SI med.Fecha_Medicion >
+                               ultima_fecha ENTONCES
+
+                                ultima_fecha :=
+                                    med.Fecha_Medicion
+                            FINSI
+                        FINSI
+                    FINSI
+                    leer_medicion()
+
+                FINMIENTRAS
+
+                SI cant_nuevas > 0 ENTONCES
+                    nuevo.Cant_Lecturas := cant_nuevas
+                    nuevo.Prom_Lecturas :=
+                        suma_consumos / cant_nuevas
+                    nuevo.Fecha_Ult_Lectura :=
+                        ultima_fecha
+                    promedio := nuevo.Prom_Lecturas
+                    determinar_tipo()
+                    GRABAR(NUEVO, nuevo)
+                FINSI
+            FINSI
+        FINSI
+    FINMIENTRAS
+
+    MIENTRAS cli.Id_Casa <> HV HACER
+        GRABAR(NUEVO, cli)
+        leer_cliente()
+    FINMIENTRAS
+
+    CERRAR(CLIENTE)
+    CERRAR(MEDICIONES)
+    CERRAR(NUEVO)
+
+FINACCION
