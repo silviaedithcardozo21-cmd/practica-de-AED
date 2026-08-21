@@ -1,0 +1,85 @@
+ACCION actualizar_examenes ES
+
+AMBIENTE
+
+    fecha = REGISTRO
+        dia : N(2)
+        mes : N(2)
+        año : N(4)
+    FINREGISTRO
+
+    alumno = REGISTRO
+        Nro_Legajo : N(6)
+        Apellido_Nombre : AN(60)
+        Carrera : AN(10)
+        Fecha_Ultimo_Examen_Aprobado : fecha
+        Nota : N(2)
+    FINREGISTRO
+
+    examen = REGISTRO
+        Nro_Legajo : N(6)
+        Carrera : AN(10)
+        Cod_Materia : N(4)
+        Fecha_Examen : fecha
+        Nota : N(2)
+    FINREGISTRO
+
+    alumnos : secuencia de alumno
+    examenes : secuencia de examen
+    salida : secuencia de alumno
+
+    alu : alumno
+    ex : examen
+
+
+PROCESO
+
+    ARR(alumnos)
+    ARR(examenes)
+    CREAR(salida)
+
+    AVZ(alumnos, alu)
+    AVZ(examenes, ex)
+
+    MIENTRAS NFDS(alumnos) O NFDS(examenes) HACER
+
+        SI alu.Nro_Legajo < ex.Nro_Legajo ENTONCES
+
+            GRABAR(salida, alu)
+            AVZ(alumnos, alu)
+
+        SINO
+
+            SI alu.Nro_Legajo = ex.Nro_Legajo ENTONCES
+
+                MIENTRAS NFDS(examenes) Y
+                       alu.Nro_Legajo = ex.Nro_Legajo HACER
+
+                    SI ex.Nota >= 4 ENTONCES
+                        alu.Fecha_Ultimo_Examen_Aprobado :=
+                            ex.Fecha_Examen
+                    FINSI
+
+                    AVZ(examenes, ex)
+
+                FIN MIENTRAS
+
+                GRABAR(salida, alu)
+                AVZ(alumnos, alu)
+            SINO
+                AVZ(examenes, ex)
+            FINSI
+        FINSI
+
+    FINMIENTRAS
+
+    MIENTRAS NFDS(alumnos) HACER
+        GRABAR(salida, alu)
+        AVZ(alumnos, alu)
+    FINMIENTRAS
+
+    CERRAR(alumnos)
+    CERRAR(examenes)
+    CERRAR(salida)
+
+FINACCION
