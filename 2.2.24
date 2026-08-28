@@ -1,0 +1,154 @@
+ACCION actualizacion ES
+
+AMBIENTE
+
+fecha = registro
+    año: N(4)
+    mes: 1...12
+    dia: 1...31
+finreg
+
+costo = registro
+    cod_afiliado: N(10)
+    fecha_alta: fecha
+    fecha_baja: fecha
+    cant_servicios: entero
+    costo: real
+finreg
+
+servicio = registro
+    cod_afiliado: N(10)
+    fecha_at: fecha
+    cod_servicio: N(3)
+    costo: real
+finreg
+
+costos, sal: archivo de costo ordenado por cod_afiliado
+regcost, regsal: costo
+
+servicios: archivo de servicio ordenado por cod_afiliado, fecha_at
+regserv: servicio
+
+cant: entero
+total: real
+cod: N(10)
+
+
+PROCEDIMIENTO leer_costos() ES
+    LEER(costos, regcost)
+
+    SI FDA(costos) ENT
+        regcost.cod_afiliado := HV
+    FINSI
+FINPROCEDIMIENTO
+
+
+PROCEDIMIENTO leer_servicios() ES
+    LEER(servicios, regserv)
+
+    SI FDA(servicios) ENT
+        regserv.cod_afiliado := HV
+    FINSI
+FINPROCEDIMIENTO
+
+
+PROCESO
+
+    ARR(costos)
+    ARR(servicios)
+
+    leer_costos()
+    leer_servicios()
+
+    MIENTRAS regcost.cod_afiliado <> HV O
+            regserv.cod_afiliado <> HV HACER
+
+        SI regcost.cod_afiliado < regserv.cod_afiliado ENTONCES
+
+            // No utilizó servicios esta semana
+            regsal := regcost
+            GRABAR(sal, regsal)
+            leer_costos()
+
+        SINO
+
+            SI regcost.cod_afiliado = regserv.cod_afiliado ENTONCES
+
+                // MODIFICACION / BAJA
+                regsal := regcost
+                cant := 0
+                total := 0
+
+                MIENTRAS regserv.cod_afiliado = regcost.cod_afiliado HACER
+
+                    SI regserv.cod_servicio = 000 ENTONCES
+                        regsal.fecha_baja := regserv.fecha_at
+                    SINO
+                        cant := cant + 1
+                        total := total + regserv.costo
+                    FINSI
+
+                    leer_servicios()
+
+                FINMIENTRAS
+
+                regsal.cant_servicios :=
+                    regsal.cant_servicios + cant
+
+                regsal.costo :=
+                    regsal.costo + total
+
+                GRABAR(sal, regsal)
+                leer_costos()
+
+            SINO
+
+                // ALTA
+                cod := regserv.cod_afiliado
+
+                SI regserv.cod_servicio = 001 ENTONCES
+
+                    regsal.cod_afiliado := regserv.cod_afiliado
+                    regsal.fecha_alta := regserv.fecha_at
+                    cant := 0
+                    total := 0
+
+                    MIENTRAS regserv.cod_afiliado = cod HACER
+
+                        SI regserv.cod_servicio = 000 ENTONCES
+                            regsal.fecha_baja := regserv.fecha_at
+                        SINO
+                            cant := cant + 1
+                            total := total + regserv.costo
+                        FINSI
+
+                        leer_servicios()
+
+                    FINMIENTRAS
+
+                    regsal.cant_servicios := cant
+                    regsal.costo := total
+
+                    GRABAR(sal, regsal)
+
+                SINO
+
+                    ESC("ERROR: afiliado nuevo sin servicio 001")
+
+                    MIENTRAS regserv.cod_afiliado = cod HACER
+                        leer_servicios()
+                    FINMIENTRAS
+
+                FINSI
+
+            FINSI
+
+        FINSI
+
+    FINMIENTRAS
+
+    CERRAR(costos)
+    CERRAR(servicios)
+    CERRAR(sal)
+
+FINACCION
